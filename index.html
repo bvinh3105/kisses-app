@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kisses — A Social App for Couples</title>
+  <link rel="icon" type="image/png" href="assets/heart_3d.png">
+  <link rel="stylesheet" href="style.css">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+
+  <!-- Dynamic Wallpaper Container -->
+  <div class="wallpaper-container">
+    <video class="wallpaper-video" id="wallpaperVideo" loop muted playsinline src="assets/bg_video.mp4"></video>
+  </div>
+
+  <!-- macOS Desktop Top Menu Bar -->
+  <header class="macos-menubar" id="macosMenubar">
+    <div class="menubar-left">
+      <div class="menubar-item menubar-apple"></div>
+      <div class="menubar-item" style="font-weight: 700;">Kisses</div>
+      <div class="menubar-item">File</div>
+      <div class="menubar-item">Edit</div>
+      <div class="menubar-item">View</div>
+      <div class="menubar-item">Window</div>
+      <div class="menubar-item">Help</div>
+    </div>
+    <div class="menubar-right">
+      <!-- Special Kisses Status Pill -->
+      <div class="menubar-kisses-pill active" id="menuPill" title="Toggle Kisses Widget">
+        <span class="lip-icon">💋</span>
+        <span id="menuPillCount">200</span>
+      </div>
+      <!-- System tray items -->
+      <div class="menubar-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+          <line x1="12" y1="20" x2="12.01" y2="20"></line>
+        </svg>
+      </div>
+      <div class="menubar-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="7" width="16" height="10" rx="2" ry="2"></rect>
+          <line x1="22" y1="11" x2="22" y2="13"></line>
+        </svg>
+      </div>
+      <div class="menubar-item" id="menubarClock">Tue 1:05 PM</div>
+    </div>
+  </header>
+
+  <!-- Desktop Viewport -->
+  <main class="desktop-viewport" id="desktopViewport">
+    
+    <!-- Widget Dropdown Anchor -->
+    <div class="widget-anchor" id="widgetAnchor">
+      <div class="kisses-card" id="kissesCard">
+        
+        <!-- Header -->
+        <div class="card-header">
+          <span class="card-title">Kisses</span>
+          <div class="header-actions">
+            <button class="icon-btn" id="btnSettings" title="Settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </button>
+            <button class="icon-btn" id="btnSync" title="Sync with partner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+            <button class="icon-btn" id="btnClose" title="Close widget">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                <line x1="12" y1="2" x2="12" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3D Heart Hero Image -->
+        <div class="heart-hero-container">
+          <img src="assets/heart_3d.png" class="heart-hero-img" id="heroHeart" alt="3D Pink Heart">
+        </div>
+
+        <!-- Counter & Info -->
+        <div class="counter-display">
+          <div class="kiss-number" id="kissNumber">200</div>
+          <div class="kiss-label" id="kissLabel">For you</div>
+          <div class="kiss-status" id="kissStatus">Since 6am · 92 sent</div>
+        </div>
+
+        <!-- Action Button -->
+        <div class="card-action">
+          <button class="btn-kiss" id="btnKiss">
+            <span>Kiss</span>
+          </button>
+        </div>
+
+        <!-- Particles / Eruption Container -->
+        <div class="hearts-burst-container" id="heartsBurst"></div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Dock Auxiliary Controls -->
+  <nav class="dock-controls" id="dockControls">
+    <button class="dock-btn" id="dockToggleMode" title="Toggle macOS / Mobile View">
+      <span id="dockModeIcon">📱</span>
+      <span id="dockModeText">Mobile Mode</span>
+    </button>
+    <div class="dock-separator"></div>
+    <button class="dock-btn" id="dockReceiveKiss" title="Simulate partner sending a kiss">
+      <span>💌</span>
+      <span>Receive Kiss</span>
+    </button>
+    <button class="dock-btn" id="dockToggleLive" title="Toggle Live Water Video Background">
+      <span>🌊</span>
+      <span>Live Video</span>
+    </button>
+    <div class="dock-separator"></div>
+    <button class="dock-btn" id="dockToggleSound" title="Toggle Sound FX">
+      <span id="dockSoundIcon">🔊</span>
+    </button>
+  </nav>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Preferences</h3>
+        <button class="icon-btn" id="btnCloseSettings">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label class="setting-label">Partner Name</label>
+          <input type="text" class="setting-input" id="inputPartnerName" value="My Love">
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">Tracking Since</label>
+          <input type="text" class="setting-input" id="inputSinceTime" value="6am">
+        </div>
+        <div class="setting-toggle">
+          <span class="setting-label">Sound Effects</span>
+          <div class="toggle-switch on" id="toggleSoundSwitch">
+            <div class="toggle-knob"></div>
+          </div>
+        </div>
+        <div class="setting-toggle">
+          <span class="setting-label">Haptic Vibration</span>
+          <div class="toggle-switch on" id="toggleHapticSwitch">
+            <div class="toggle-knob"></div>
+          </div>
+        </div>
+        <div class="setting-group" style="margin-top: 10px;">
+          <button class="dock-btn" id="btnResetCounters" style="justify-content: center; background: rgba(227, 24, 89, 0.2); border-color: rgba(227, 24, 89, 0.4); color: #ff6b9d;">
+            Reset Today's Counters
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notice -->
+  <div class="toast-notice" id="toastNotice">
+    <span class="toast-icon">✨</span>
+    <span class="toast-text" id="toastText">Synced with partner!</span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
