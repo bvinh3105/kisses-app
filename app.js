@@ -17,7 +17,9 @@ const defaultState = {
   hapticEnabled: true,
   mode: 'desktop', // 'desktop' or 'widget'
   widgetOpen: true,
-  liveVideo: false
+  liveVideo: false,
+  roomId: null,
+  role: null // 'a' (created the room) or 'b' (joined via invite link)
 };
 
 let state = { ...defaultState };
@@ -149,7 +151,113 @@ function triggerHaptic(duration = 18) {
 }
 
 // ==========================================
-// 3. Multi-Heart Eruption Particle Engine
+// 3. Realtime Partner Sync (Cloudflare Worker + Durable Object)
+// ==========================================
+const SYNC_HOST = 'kisses-app-sync.bachvinhtran.workers.dev';
+
+function genRoomId() {
+  return crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+}
+
+// Assign this device a room from the invite link, or create a fresh one
+function initRoom() {
+  const params = new URLSearchParams(window.location.search);
+  const roomFromLink = params.get('room');
+
+  if (roomFromLink) {
+    state.roomId = roomFromLink;
+    state.role = 'b';
+    saveState();
+    window.history.replaceState({}, '', window.location.pathname);
+  } else if (!state.roomId) {
+    state.roomId = genRoomId();
+    state.role = 'a';
+    saveState();
+  }
+}
+
+function getInviteLink() {
+  return `${window.location.origin}${window.location.pathname}?room=${state.roomId}`;
+}
+
+let syncSocket = null;
+let syncRetryDelay = 1000;
+let lastFromA = null;
+let lastFromB = null;
+let partnerWasOnline = false;
+
+function connectSync() {
+  if (!state.roomId) return;
+
+  syncSocket = new WebSocket(`wss://${SYNC_HOST}/room/${state.roomId}?role=${state.role}`);
+
+  syncSocket.addEventListener('open', () => {
+    syncRetryDelay = 1000;
+  });
+
+  syncSocket.addEventListener('message', (evt) => {
+    let msg;
+    try {
+      msg = JSON.parse(evt.data);
+    } catch {
+      return;
+    }
+    if (msg.type === 'state') {
+      applyServerState(msg.kissesFromA, msg.kissesFromB);
+      applyPeerInfo(msg);
+    } else if (msg.type === 'peers') {
+      applyPeerInfo(msg);
+    }
+  });
+
+  syncSocket.addEventListener('close', () => {
+    syncSocket = null;
+    setTimeout(connectSync, syncRetryDelay);
+    syncRetryDelay = Math.min(syncRetryDelay * 1.6, 15000);
+  });
+
+  syncSocket.addEventListener('error', () => {
+    syncSocket?.close();
+  });
+}
+
+function sendSync(msg) {
+  if (syncSocket && syncSocket.readyState === WebSocket.OPEN) {
+    syncSocket.send(JSON.stringify(msg));
+  }
+}
+
+function applyServerState(kissesFromA, kissesFromB) {
+  const isFirstSnapshot = lastFromA === null;
+  const prevReceived = state.role === 'a' ? lastFromB : lastFromA;
+  const newReceived = state.role === 'a' ? kissesFromB : kissesFromA;
+  const newSent = state.role === 'a' ? kissesFromA : kissesFromB;
+
+  state.sentCount = newSent;
+  state.receivedCount = newReceived;
+  saveState();
+  updateUI();
+
+  if (!isFirstSnapshot && newReceived > prevReceived) {
+    celebrateReceivedKiss(false);
+  }
+
+  lastFromA = kissesFromA;
+  lastFromB = kissesFromB;
+}
+
+function applyPeerInfo({ aOnline, bOnline }) {
+  const partnerOnline = state.role === 'a' ? bOnline : aOnline;
+  if (partnerOnline && !partnerWasOnline) {
+    showToast(`${state.partnerName} đã kết nối 💞`);
+  } else if (!partnerOnline && partnerWasOnline) {
+    showToast(`${state.partnerName} tạm ngoại tuyến`);
+  }
+  partnerWasOnline = partnerOnline;
+}
+
+// ==========================================
+// 4. Multi-Heart Eruption Particle Engine
 // ==========================================
 const container = document.getElementById('heartsBurst');
 
@@ -221,7 +329,7 @@ function createFloatingHeart(originX, originY, index) {
 }
 
 // ==========================================
-// 4. UI Rendering & Interactions
+// 5. UI Rendering & Interactions
 // ==========================================
 const kissNumberEl = document.getElementById('kissNumber');
 const kissLabelEl = document.getElementById('kissLabel');
@@ -331,10 +439,11 @@ function handleKiss(e) {
   playKissSound(pitch);
   triggerHaptic(18);
 
-  // Increment sent kisses
+  // Increment sent kisses (optimistic; server snapshot reconciles it)
   state.sentCount++;
   saveState();
   updateUI();
+  sendSync({ type: 'kiss' });
 
   // Button Ripple Effect
   const rect = btnKiss.getBoundingClientRect();
@@ -368,46 +477,73 @@ heroHeart.addEventListener('click', (e) => {
   handleKiss(e);
 });
 
-// Simulate Partner Sending a Kiss
-function handleReceiveKiss() {
-  state.receivedCount++;
-  saveState();
-  updateUI();
-
+// Shared "kiss received" effect: sound, haptics, animation, toast.
+// isDemo=true previews the effect without touching any counter (used
+// when there's no real partner connected yet, so nothing gets out of
+// sync with the server's authoritative count).
+function celebrateReceivedKiss(isDemo) {
   playReceiveSound();
   triggerHaptic(35);
 
-  // Number bump animation
   kissNumberEl.classList.remove('bump');
   void kissNumberEl.offsetWidth;
   kissNumberEl.classList.add('bump');
 
-  // Hero heart squish
   heroHeart.classList.remove('squish');
   void heroHeart.offsetWidth;
   heroHeart.classList.add('squish');
 
-  // Spawn sweet hearts floating around the hero heart
   const cardRect = document.getElementById('kissesCard').getBoundingClientRect();
   const heroRect = heroHeart.getBoundingClientRect();
   const originX = heroRect.left - cardRect.left + (heroRect.width / 2);
   const originY = heroRect.top - cardRect.top + (heroRect.height / 2);
   spawnKissEruption(originX, originY + 40);
 
-  showToast(`Kiss received from ${state.partnerName}! 💖`);
+  showToast(isDemo
+    ? 'Xem trước hiệu ứng nhận kiss ✨ (chưa mời partner nên chưa tính số đếm)'
+    : `Kiss received from ${state.partnerName}! 💖`);
 }
 
-dockReceiveKiss.addEventListener('click', handleReceiveKiss);
+// Legacy local-only simulate, kept as a fallback demo for whenever
+// there's no live partner connection (offline, or not paired yet).
+function handleReceiveKiss() {
+  state.receivedCount++;
+  saveState();
+  updateUI();
+  celebrateReceivedKiss(false);
+}
 
-// Sync button
-btnSync.addEventListener('click', () => {
+dockReceiveKiss.addEventListener('click', () => {
+  if (syncSocket && syncSocket.readyState === WebSocket.OPEN && partnerWasOnline) {
+    celebrateReceivedKiss(true);
+  } else {
+    handleReceiveKiss();
+  }
+});
+
+// Sync button = invite partner via shareable link
+btnSync.addEventListener('click', async () => {
+  const link = getInviteLink();
   btnSync.classList.add('spinning');
   playKissSound(1.2);
-  showToast('Connecting with ' + state.partnerName + '...');
-  setTimeout(() => {
-    btnSync.classList.remove('spinning');
-    showToast('Everything in sync! ✨');
-  }, 900);
+
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: 'Kisses', text: 'Ghép đôi Kisses với mình nhé 💋', url: link });
+      showToast('Đã gửi lời mời ghép đôi 💌');
+    } else {
+      await navigator.clipboard.writeText(link);
+      showToast('Đã copy link mời — gửi cho partner để ghép đôi 💌');
+    }
+  } catch (e) {
+    try {
+      window.prompt('Copy link mời partner:', link);
+    } catch (e2) {
+      showToast('Không tự copy được — link mời: ' + link);
+    }
+  } finally {
+    setTimeout(() => btnSync.classList.remove('spinning'), 400);
+  }
 });
 
 // Close button
@@ -488,6 +624,7 @@ btnResetCounters.addEventListener('click', () => {
     state.sentCount = 0;
     saveState();
     updateUI();
+    sendSync({ type: 'reset' });
     showToast('Counters reset! 🔄');
     settingsModal.classList.remove('open');
   }
@@ -511,7 +648,9 @@ updateClock();
 
 // Initial load
 loadState();
+initRoom();
 updateUI();
+connectSync();
 console.log('Kisses App initialized successfully!');
 
 // Auto-kiss test trigger for visual verification
