@@ -22,17 +22,48 @@ export class KissRoom {
 
     const url = new URL(request.url);
     const role = url.searchParams.get('role') === 'b' ? 'b' : 'a';
+    const clientId = url.searchParams.get('clientId') || crypto.randomUUID();
+
+    const occupant = this.findOccupant(role);
+    const isSelf = occupant && occupant.clientId === clientId;
+    const isTaken = occupant && !isSelf;
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
+    // A different person already holds this room's other seat — this is a
+    // 2-person room by design, so a 3rd distinct visitor gets turned away.
+    if (isTaken) {
+      this.ctx.acceptWebSocket(server);
+      server.send(JSON.stringify({ type: 'rejected', reason: 'room-full' }));
+      server.close(4001, 'room-full');
+      return new Response(null, { status: 101, webSocket: client });
+    }
+
+    // Same device reconnecting (refresh, flaky network) — replace its old socket.
+    if (isSelf) {
+      try {
+        occupant.ws.close(4000, 'replaced');
+      } catch {
+        // already gone
+      }
+    }
+
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ role });
+    server.serializeAttachment({ role, clientId });
 
     server.send(JSON.stringify({ type: 'state', ...this.state, ...this.peerInfo() }));
     this.broadcastPeers();
 
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  findOccupant(role) {
+    for (const ws of this.ctx.getWebSockets()) {
+      const att = ws.deserializeAttachment();
+      if (att?.role === role) return { ws, clientId: att.clientId };
+    }
+    return null;
   }
 
   async webSocketMessage(ws, message) {

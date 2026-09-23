@@ -19,7 +19,8 @@ const defaultState = {
   widgetOpen: true,
   liveVideo: false,
   roomId: null,
-  role: null // 'a' (created the room) or 'b' (joined via invite link)
+  role: null, // 'a' (created the room) or 'b' (joined via invite link)
+  clientId: null // stable per-device id, so reconnects don't look like a 3rd person
 };
 
 let state = { ...defaultState };
@@ -161,6 +162,11 @@ function genRoomId() {
 
 // Assign this device a room from the invite link, or create a fresh one
 function initRoom() {
+  if (!state.clientId) {
+    state.clientId = crypto.randomUUID();
+    saveState();
+  }
+
   const params = new URLSearchParams(window.location.search);
   const roomFromLink = params.get('room');
 
@@ -182,14 +188,16 @@ function getInviteLink() {
 
 let syncSocket = null;
 let syncRetryDelay = 1000;
+let syncBlocked = false;
 let lastFromA = null;
 let lastFromB = null;
 let partnerWasOnline = false;
 
 function connectSync() {
-  if (!state.roomId) return;
+  if (!state.roomId || syncBlocked) return;
 
-  syncSocket = new WebSocket(`wss://${SYNC_HOST}/room/${state.roomId}?role=${state.role}`);
+  const params = `role=${state.role}&clientId=${state.clientId}`;
+  syncSocket = new WebSocket(`wss://${SYNC_HOST}/room/${state.roomId}?${params}`);
 
   syncSocket.addEventListener('open', () => {
     syncRetryDelay = 1000;
@@ -207,11 +215,16 @@ function connectSync() {
       applyPeerInfo(msg);
     } else if (msg.type === 'peers') {
       applyPeerInfo(msg);
+    } else if (msg.type === 'rejected') {
+      handleSyncRejected(msg.reason);
     }
   });
 
-  syncSocket.addEventListener('close', () => {
+  syncSocket.addEventListener('close', (evt) => {
     syncSocket = null;
+    // Code 4000 = another tab/device of ours took over this seat; 4001 = a
+    // 3rd distinct visitor was turned away. Neither should keep retrying.
+    if (syncBlocked || evt.code === 4000 || evt.code === 4001) return;
     setTimeout(connectSync, syncRetryDelay);
     syncRetryDelay = Math.min(syncRetryDelay * 1.6, 15000);
   });
@@ -219,6 +232,13 @@ function connectSync() {
   syncSocket.addEventListener('error', () => {
     syncSocket?.close();
   });
+}
+
+function handleSyncRejected(reason) {
+  syncBlocked = true;
+  if (reason === 'room-full') {
+    showToast('Phòng này đã đủ 2 người rồi 💔');
+  }
 }
 
 function sendSync(msg) {
